@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton } from 'element-plus'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { ElBreadcrumb, ElBreadcrumbItem, ElDropdown, ElDropdownMenu, ElDropdownItem, ElButton } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const collapsed = ref(false)
+
+// 面包屑数据
+const breadcrumbs = computed(() => {
+  const matched = route.matched.filter(item => item.meta && item.meta.title)
+  // 如果没有匹配项，添加首页
+  if (matched.length === 0) {
+    return [{ path: '/', meta: { title: '首页' } }]
+  }
+  return matched
+})
 
 // 暴露折叠状态给父组件
 defineExpose({
@@ -22,11 +33,28 @@ const handleCommand = (command: string) => {
       break
   }
 }
+
+const handleBreadcrumbClick = (path: string) => {
+  if (path !== route.path) {
+    router.push(path)
+  }
+}
 </script>
 
 <template>
   <div class="layout-header">
     <div class="header-left">
+      <!-- 面包屑 -->
+      <el-breadcrumb separator="/">
+        <el-breadcrumb-item
+          v-for="item in breadcrumbs"
+          :key="item.path"
+          :to="item.path"
+        >
+          {{ item.meta?.title || '首页' }}
+        </el-breadcrumb-item>
+      </el-breadcrumb>
+
       <div class="logo">
         <span class="logo-text">管理后台</span>
       </div>
@@ -65,6 +93,7 @@ const handleCommand = (command: string) => {
 .header-left {
   display: flex;
   align-items: center;
+  gap: 20px;
 }
 
 .logo {
