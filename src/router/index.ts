@@ -1,39 +1,25 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
-import Layout from '@/layouts/index.vue'
+import { setupPermissionGuard } from './permission'
 
-const routes: RouteRecordRaw[] = [
-    {
-        path: '/',
-        component: Layout,
-        redirect: '/home',
-        meta: { title: '首页' },
-        children: [
-            {
-                path: '/home',
-                name: 'Home',
-                meta: { title: '首页' },
-                component: () => import('@/pages/home/index.vue'),
-            },
-            {
-                path: '/about',
-                name: 'About',
-                meta: { title: '关于' },
-                component: () => import('@/pages/about/index.vue'),
-            },
-        ]
-    },
-    {
-        path: '/login',
-        name: 'Login',
-        meta: { title: '登录' },
-        component: () => import('@/pages/login/index.vue'),
-    },
+// 基础静态路由（登录页等公共路由）
+const constantRoutes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'Login',
+    meta: { title: '登录' },
+    component: () => import('@/pages/login/index.vue'),
+  },
 ]
 
+// 动态路由（由权限守卫动态添加）
+const dynamicRoutes: RouteRecordRaw[] = []
 
 const router = createRouter({
-    history: createWebHashHistory(),
-    routes,
+  history: createWebHashHistory(),
+  routes: [...constantRoutes, ...dynamicRoutes],
 })
+
+// 设置权限守卫
+setupPermissionGuard(router)
 
 export default router

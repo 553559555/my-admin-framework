@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { usePermissionStore } from '@/store/permission'
 
 const route = useRoute()
 const router = useRouter()
+const permissionStore = usePermissionStore()
 
-// 菜单数据
-const menuData = [
-  {
-    path: '/',
-    title: '首页',
-    icon: 'House'
-  },
-  {
-    path: '/about',
-    title: '关于',
-    icon: 'InfoFilled'
-  }
-]
+// 菜单数据（从 store 获取）
+const menuData = computed(() => {
+  return permissionStore.menus.map((menu) => ({
+    path: menu.path,
+    title: menu.meta?.title || menu.title,
+    icon: menu.meta?.icon || 'Menu',
+    children: menu.children,
+  }))
+})
 
 const activeMenu = computed(() => route.path)
 
