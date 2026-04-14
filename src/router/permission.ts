@@ -2,6 +2,82 @@ import type { RouteRecordRaw } from 'vue-router'
 import { usePermissionStore } from '@/store/permission'
 import type { MenuItem } from '@/services/menu'
 
+type RouteComponent = NonNullable<RouteRecordRaw['component']>
+type ResolvedRouteComponent = {
+  component: RouteComponent
+  missingComponent?: string
+}
+
+const pageModules = import.meta.glob('../pages/**/*.vue')
+const layoutModules = import.meta.glob('../layouts/**/*.vue')
+const fallbackRouteComponent = pageModules['../pages/system/route-missing.vue'] as
+  | RouteComponent
+  | undefined
+
+function normalizeModulePath(filePath: string, baseDir: 'pages' | 'layouts') {
+  return filePath.replace(new RegExp(`^\.\./${baseDir}/`), '').replace(/\.vue$/, '')
+}
+
+function createPageComponentMap() {
+  return Object.fromEntries(
+    Object.entries(pageModules).map(([filePath, component]) => [
+      normalizeModulePath(filePath, 'pages'),
+      component as RouteComponent,
+    ]),
+  )
+}
+
+function createLayoutComponentMap() {
+  return Object.entries(layoutModules).reduce<Record<string, RouteComponent>>((accumulator, [filePath, component]) => {
+    const normalizedPath = normalizeModulePath(filePath, 'layouts')
+
+    accumulator[normalizedPath] = component as RouteComponent
+    if (normalizedPath === 'index') {
+      accumulator.Layout = component as RouteComponent
+    }
+
+    return accumulator
+  }, {})
+}
+
+const pageComponentMap = createPageComponentMap()
+const layoutComponentMap = createLayoutComponentMap()
+
+function normalizeComponentPath(component: string) {
+  return component
+    .trim()
+    .replace(/^@\//, '')
+    .replace(/^\/?src\//, '')
+    .replace(/^\/+/, '')
+    .replace(/\.vue$/, '')
+}
+
+function resolveRouteComponent(component: string): ResolvedRouteComponent {
+  const normalizedPath = normalizeComponentPath(component)
+  const layoutComponent = layoutComponentMap[normalizedPath.replace(/^layouts\//, '')]
+
+  if (layoutComponent) {
+    return { component: layoutComponent }
+  }
+
+  const pageComponent = pageComponentMap[normalizedPath.replace(/^pages\//, '')]
+
+  if (pageComponent) {
+    return { component: pageComponent }
+  }
+
+  if (!fallbackRouteComponent) {
+    throw new Error('未找到降级页面组件: system/route-missing')
+  }
+
+  console.warn(`[router] 未找到路由组件: ${component}`)
+
+  return {
+    component: fallbackRouteComponent,
+    missingComponent: component,
+  }
+}
+
 /**
  * 过滤隐藏的菜单
  */
@@ -26,12 +102,15 @@ function transformMenuToRoute(menu: MenuItem): RouteRecordRaw {
 
   // 处理组件路径
   if (menu.component) {
-    // 布局组件
-    if (menu.component === 'Layout') {
-      route.component = () => import('@/layouts/index.vue')
-    } else {
-      // 页面组件
-      route.component = () => import(`@/pages/${menu.component}.vue`)
+    const resolvedComponent = resolveRouteComponent(menu.component)
+
+    route.component = resolvedComponent.component
+
+    if (resolvedComponent.missingComponent) {
+      route.meta = {
+        ...(route.meta ?? {}),
+        missingComponent: resolvedComponent.missingComponent,
+      }
     }
   }
 
